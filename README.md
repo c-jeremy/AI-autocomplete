@@ -29,3 +29,15 @@ We use the Gemini 2.5 Flash Lite model for instant response.
 1. Make sure you have Tampermonkey installed on your browser, and install the script in this repo.
 2. Remember to edit the API Key in the code.
 3. Open up an AI website and wait till it is fully loaded. Enjoy!
+
+
+## Usage
+
+1. Make sure you have your API key configured in the script.
+2. Fire up a web page of an AI chatbot. Input some words.
+3. Wait for 1-2 secs; the AI shall either: Complete your prompt, OR offer a quick and concise Answer. The mode it uses is per request and is Auto decided by default.
+   ![Screenshot_20251130_000625](https://github.com/user-attachments/assets/326dc08c-c878-4200-859d-9af1cc41b38c)
+   ![Screenshot_20251130_000816](https://github.com/user-attachments/assets/a28384c8-fc55-4b03-975a-9962b86ccca5)
+4. If it does not meet your needs, (e.g. the model attempts to complete your prompt when you want it to directly answer it, or vice versa) add `/ans` or `/com` to the very end of your prompt to manually nudge the AI into your desired mode.
+
+   
