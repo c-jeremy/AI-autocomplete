@@ -29,12 +29,13 @@ We use the Gemini 2.5 Flash Lite model for instant response.
 ### Prerequisites
 
 - A modern browser, with Tampermonkey installed
+- A [Google AI Studio](https://ai.studio) API Key
 
 ### Installation
 
 0. Star this repo.
 1. Make sure you have Tampermonkey installed on your browser, and install the script in this repo.
-2. Remember to edit the API Key in the code.
+2. Remember to edit [the API Key in the code](https://github.com/c-jeremy/AI-autocomplete/blob/2bdb885cc41ccba3daf83028d00499470ab9e715/autocomplete.user.js#L25).
 3. Open up an AI website and wait till it is fully loaded. Enjoy!
 
 
