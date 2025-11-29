@@ -6,7 +6,7 @@ AIs shouldn't have worked that way; it should answer preemptively.
 
 AI-autocomplete is a JavaScript-based project that explores a different approach to AI web app interactions. Rather than waiting for complete user queries, this project focuses on AI systems that proactively anticipate and respond to user needs before being explicitly asked.
 
-The script automatically works on many major AI web apps: `[ChatGPT, Claude, Qwen, DeepSeek]`, without any configurations. (apart from API key settings)
+The script automatically works on many major AI web apps: `[ChatGPT, Claude, Qwen, DeepSeek]`, without any configurations needed. (apart from API key settings)
 
 We use the Gemini 2.5 Flash Lite model for instant response.
 
