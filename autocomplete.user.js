@@ -6,8 +6,9 @@
 // @author       c-jeremy
 // @match        https://claude.ai/*
 // @match        https://chatgpt.com/*
+// @match        https://chat.qwen.ai/*
+// @match        https://chat.deepseek.com/*
 // @connect      generativelanguage.googleapis.com
-
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -23,7 +24,7 @@
         // !!! 务必在此填入你的 API KEY !!!
         apiKey: "AIzaSy...",
 
-        endpoint: "https://generativeai.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
+        endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
         debounceTime: 700,
     };
 
@@ -228,7 +229,7 @@
         ui.hide();
     }
 
-    function fetchSuggestions(userText) {
+    function fetchSuggestions(userText, forceMode = null) {
         if (!CONFIG.apiKey) return;
 
         const requestText = userText;
@@ -238,21 +239,11 @@
 
         const finalUrl = `${CONFIG.endpoint}?key=${CONFIG.apiKey}`;
 
-        // === 核心 Prompt：一次性分类 + 生成 ===
-        // 使用 JSON 模式强制结构化输出，大大降低解析难度
-        const systemPrompt = `
+        // === 1. Dynamic Prompt Construction based on Force Mode ===
+        let systemPrompt = "";
 
-        Determine if user is asking a factual question with a definite, short answer (Mode: ANSWER), or just typing that needs completion (Mode: COMPLETION).
-
-        IS ANSWER MODE RULES:
-        1. Query must be factual. NOT NECESSARILY COMPLETE.
-        2. Answer must be certain and short. MAX=30words
-        3. User input implies a question EVEN IF incomplete.
-
-        ELSE is COMPLETION mode.
-        1. Provide 3 diverse & concise continuations of the given text to build up QUESTIONS.
-        2. NEVER repeat the Input. Output ONLY the remaining text (Suffix).
-
+        // The common JSON footer
+        const jsonFooter = `
         Output ONLY JSON:
         {
           "mode": "ANSWER" or "COMPLETION",
@@ -260,6 +251,47 @@
         }
         (If ANSWER, 'candidates' has 1 string. If COMPLETION, 'candidates' has 3 strings).
         `;
+
+        if (forceMode === 'ANSWER') {
+            systemPrompt = `
+            TASK: BRIEFLY ANSWER USER INPUT.
+            NOTE:
+            1. Query must be factual. NOT NECESSARILY COMPLETE.
+            2. Answer must be certain and short. MAX=30words.
+            3. User input implies a question EVEN IF incomplete.
+            {
+              "mode": "ANSWER",
+              "candidates": ["the_answer"]
+            }
+            `;
+        } else if (forceMode === 'COMPLETION') {
+            systemPrompt = `
+            TASK: COMPLETE THE USER INPUT WITH THE SUFFIX OF IT.
+            RULES:
+            1. Provide 3 diverse & concise continuations of the given text to build up QUESTIONS.
+            2. NEVER repeat the Input! Output ONLY the remaining text (Suffix).
+            OUTPUT ONLY JSON:
+            {
+              "mode": "COMPLETION",
+              "candidates": ["suffix_1", "suffix_2", "suffix3"]
+            }
+            `;
+        } else {
+            // Original Default Logic
+            systemPrompt = `
+            Determine if user is asking a factual question with a definite, short answer (Mode: ANSWER), or just typing that needs completion (Mode: COMPLETION).
+
+            IS ANSWER MODE RULES:
+            1. Query must be factual. NOT NECESSARILY COMPLETE.
+            2. Answer must be certain and short. MAX=30words
+            3. User input implies a question EVEN IF incomplete.
+
+            ELSE is COMPLETION mode.
+            1. Provide 3 diverse & concise continuations of the given text to build up QUESTIONS.
+            2. NEVER repeat the Input. Output ONLY the remaining text (Suffix).
+            ${jsonFooter}
+            `;
+        }
 
         const payload = {
             "contents": [{
@@ -284,15 +316,20 @@
                 if (response.status === 200) {
                     try {
                         const el = getActiveInput();
-                const currentText = el ? el.innerText.trim() : "";
+                        let currentText = el ? el.innerText.trim() : "";
 
-                // 如果现在的文本 和 请求时的文本 不一致
-                // 说明用户在请求期间又打字了，这个回复已经没用了，直接丢弃
-                if (currentText !== requestText) {
-                    // 保持 silent，不要 hide，因为可能新的请求正在路上
-                    // 仅仅只是不处理这次过期的结果
-                    return;
-                }
+                        // === Stale Check Fix for Force Mode ===
+                        // If we are in force mode, the DOM text still has "/ans" or "/com",
+                        // but requestText (userText) was cleaned. We must strip the command from DOM text before comparing.
+                        if (forceMode === 'ANSWER') currentText = currentText.replace(/\/ans$/, '').trim();
+                        if (forceMode === 'COMPLETION') currentText = currentText.replace(/\/com$/, '').trim();
+
+                        // 如果现在的文本 和 请求时的文本 不一致
+                        // 说明用户在请求期间又打字了，这个回复已经没用了，直接丢弃
+                        if (currentText !== requestText) {
+                            return;
+                        }
+
                         const data = JSON.parse(response.responseText);
                         const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
@@ -317,7 +354,7 @@
                 ui.hide();
             }
         });
-    }
+}
 
     // ================= 事件监听 (包含修复后的逻辑) =================
 
@@ -330,14 +367,14 @@
         if (!el) return;
 
         // 全局开关 Toggle
-        if (e.key === '*' && el.innerText.trim().length < 2) {
+        /*if (e.key === '*' && el.innerText.trim().length < 2) {
             e.preventDefault();
             state.enabled = !state.enabled;
             GM_setValue('copilot_enabled', state.enabled);
             ui.show(state.enabled ? `<div class="copilot-status">Copilot On</div>` : `<div class="copilot-status">See you.</div>`);
             setTimeout(() => ui.hide(), 1500);
             return;
-        }
+        }*/
 
         if (!state.enabled) return;
 
@@ -345,22 +382,47 @@
         if (e.key === 'Escape') ui.hide();
     }, true);
 
-    // 输入监听 (包含移动端数字选择 + 递归锁)
+    // Input Listener (Mobile-Friendly Toggle + Commands + Selection)
     document.addEventListener('input', (e) => {
         if (state.isInternalChange) return;
 
         const el = getActiveInput();
-        if (!el || !state.enabled) return;
+        if (!el) return;
+        state.activeInput = el;
 
-        state.activeInput = el; // 确保 activeInput 更新
-        const currentText = el.innerText;
+        const currentText = el.innerText; // Keep raw text for checking
+        const trimmedText = currentText.trim();
 
-        // === 选择逻辑 ===
+        // === 1. Mobile-Friendly Toggle (Detect '*' as sole input) ===
+        // If the user clears the input and types just '*', toggle.
+        if (trimmedText === '*') {
+            // Prevent recursive loop by setting internal flag
+            state.isInternalChange = true;
+            try {
+                // Remove the asterisk so it doesn't stay in the box
+                document.execCommand('delete');
+
+                // Toggle State
+                state.enabled = !state.enabled;
+                GM_setValue('copilot_enabled', state.enabled);
+
+                // Show Feedback
+                ui.show(state.enabled
+                    ? `<div class="copilot-status">Copilot On</div>`
+                    : `<div class="copilot-status">See you.</div>`
+                );
+                setTimeout(() => ui.hide(), 1500);
+            } finally {
+                setTimeout(() => { state.isInternalChange = false; }, 100);
+            }
+            return;
+        }
+
+        if (!state.enabled) return;
+
+        // === 2. Selection Logic (1, 2, 3) ===
         if (state.candidates.length > 0) {
             const lastChar = currentText.slice(-1);
-
-            // 如果是 Answer 模式，只响应 '1'
-            // 如果是 Completion 模式，响应 '1', '2', '3'
             const validKeys = state.mode === 'answer' ? ['1'] : ['1', '2', '3'];
 
             if (validKeys.includes(lastChar)) {
@@ -370,8 +432,24 @@
                 if (targetText) {
                     state.isInternalChange = true;
                     try {
-                        document.execCommand('delete'); // 删掉数字
-                        insertText(targetText); // 填入内容
+                        // We need to delete the number '1' AND the command '/ans' if present
+                        // Calculate how many chars to delete
+                        let deleteCount = 1; // Always delete the number
+
+                        // Check if text ends with command + number (e.g. "Question /ans1")
+                        const textBeforeNumber = currentText.slice(0, -1);
+                        if (textBeforeNumber.endsWith('/ans') || textBeforeNumber.endsWith('/com')) {
+                            deleteCount += 4; // delete '/ans' (4 chars)
+                        } else if (textBeforeNumber.endsWith('/ans ') || textBeforeNumber.endsWith('/com ')) {
+                            deleteCount += 5; // Handle potential space
+                        }
+
+                        // Execute delete N times
+                        for(let i=0; i<deleteCount; i++) {
+                            document.execCommand('delete');
+                        }
+
+                        insertText(targetText);
                     } finally {
                         setTimeout(() => { state.isInternalChange = false; }, 100);
                     }
@@ -380,19 +458,32 @@
             }
         }
 
-        // === 防抖请求逻辑 ===
+        // === 3. Trigger & Command Detection ===
         clearTimeout(state.debounceTimer);
-        ui.hide(); // 输入新内容时隐藏旧建议
+        ui.hide();
 
-        if (currentText.trim().length < 4) return;
+        if (trimmedText.length < 4) return;
 
         state.debounceTimer = setTimeout(() => {
             if (document.activeElement === el) {
-                fetchSuggestions(el.innerText.trim());
+                // Check for commands
+                let promptText = el.innerText.trim(); // Get fresh text
+                let forceMode = null;
+
+                if (promptText.endsWith('/ans')) {
+                    forceMode = 'ANSWER';
+                    promptText = promptText.slice(0, -4).trim(); // Remove command from AI payload
+                } else if (promptText.endsWith('/com')) {
+                    forceMode = 'COMPLETION';
+                    promptText = promptText.slice(0, -4).trim(); // Remove command from AI payload
+                }
+
+                if (promptText.length > 0) {
+                    fetchSuggestions(promptText, forceMode); // Pass forceMode to API
+                }
             }
         }, CONFIG.debounceTime);
     }, true);
-
     document.addEventListener('focusin', (e) => {
         const el = getActiveInput();
         if (el && state.enabled) {
