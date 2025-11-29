@@ -1,6 +1,13 @@
 # AI-autocomplete
 
 AIs shouldn't have worked that way; it should answer preemptively. 
+<p align="center">
+  <img src="https://img.shields.io/badge/Userscript-Tampermonkey-blue.svg" alt="Userscript">
+  <img src="https://img.shields.io/github/license/c-jeremy/AI-autocomplete" alt="License">
+  <img src="https://img.shields.io/github/stars/c-jeremy/AI-autocomplete?style=social" alt="Stars">
+  <img src="https://img.shields.io/github/forks/c-jeremy/AI-autocomplete?style=social" alt="Forks">
+</p>
+
 
 ## Overview
 
