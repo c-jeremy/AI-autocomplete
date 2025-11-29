@@ -19,9 +19,9 @@
 (function() {
     'use strict';
 
-    // ================= 配置区域 =================
+    // ================= CONFIG =================
     const CONFIG = {
-        // !!! 务必在此填入你的 API KEY !!!
+        // !!! Enter your API KEY !!!
         apiKey: "AIzaSy...",
 
         endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",
